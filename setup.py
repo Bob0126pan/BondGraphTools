@@ -38,4 +38,7 @@ setuptools.setup(
             'sphinx >= 1.7',
             'sphinx_rtd_theme']},
     install_requires=requirements
+#     include_dirs = [r'C:\Program Files\SUNDIALS\include'],
+#     library_dirs = [r'C:\Program Files\SUNDIALS\lib'],
+#     libraries = ['sundials_cvode', 'sundials_nvecserial', ...]  # 视你使用模块而定
 )

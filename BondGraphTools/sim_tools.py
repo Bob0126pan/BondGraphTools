@@ -17,7 +17,7 @@ def _fetch_ic(x0, dx0, system, func, t0, eps=0.001):
         X0 = np.array(x0, dtype=np.float64)
     elif isinstance(x0, dict):
         X0 = np.array(
-            [np.NaN for _ in system.state_vars], dtype=np.float64
+            [np.nan for _ in system.state_vars], dtype=np.float64
         )
         for k, v in x0.items():
             _, idx = str(k).split('_')
@@ -202,7 +202,7 @@ def _bondgraph_to_residuals(model, control_vars=None):
     t = sp.S('t')
 
     if not u_func:
-        F = sp.lambdify((t, X, dX), Fsym)
+        F = sp.lambdify((t, X, dX), list(Fsym))
 
         def residual(_t, _x, _dx, _res):
             _r = F(_t, _x, _dx)
