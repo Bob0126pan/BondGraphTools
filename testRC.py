@@ -2,11 +2,13 @@ from BondGraphTools import new, draw, simulate
 model = new(name='RC')
 C = new("C", value=1.0)
 R = new("R", value=1.0)
-KCL = new("0")
-from BondGraphTools import add, connect
-add(model, R,C,KCL)
-connect(R,KCL)
-connect(C,KCL)
+se = new("Se", value=1.0)
+one = new("1")
+from BondGraphTools import add, connect, expose
+add(model, R,C,one,se)
+connect(se,one)
+connect(R,one)
+connect(C,one)
 model.state_vars
 timespan = [0, 5]
 x0 = {'x_0':1}

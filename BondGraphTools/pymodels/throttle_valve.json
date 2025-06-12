@@ -1,0 +1,16 @@
+{
+  "name": "ThrottleValve",
+  "components": [
+    {"type": "R", "name": "FlowR", "params": {"value": 0.6}},
+    {"type": "R", "name": "LeakR", "params": {"value": 1e-8}},
+    {"type": "0", "name": "Junction"}
+  ],
+  "connections": [
+    ["FlowR", "Junction"],
+    ["LeakR", "Junction"]
+  ],
+  "exposed_ports": {
+    "FlowR": "in",
+    "LeakR": "out"
+  }
+}

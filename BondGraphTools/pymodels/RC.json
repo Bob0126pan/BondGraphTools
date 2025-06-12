@@ -1,0 +1,22 @@
+{
+  "id": "my_comp_lib",
+  "description": "My Custom Components",
+  "components": {
+    "RCBlock": {
+      "description": "Resistor + Capacitor block",
+      "class": "Composite",
+      "subcomponents": {
+        "R1": {"type": "R", "value": 1.0},
+        "C1": {"type": "C", "value": 1.0},
+        "J":  {"type": "0"}
+      },
+      "connections": [
+        ["R1", "J"],
+        ["C1", "J"]
+      ],
+      "expose_ports": {
+        "R1": "in"
+      }
+    }
+  }
+}
