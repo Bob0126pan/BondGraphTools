@@ -1,20 +1,22 @@
 from BondGraphTools import new, draw, simulate
 from BondGraphTools import add, connect, expose
+from BondGraphTools.base import Port
 submodel = new(name='subR')
 R1=new("R",value=1.0)
 one=new("1")
 C1=new("C",value=1.0)
-zero = new("0")  # 新增 0-结
-add(submodel, R1,one,C1)
-connect(R1, zero)
-connect(zero, one) # 0-结 -> 1-结
-connect( C1,one)
-expose(zero,label='P')
+ss=new("SS")
+add(submodel, R1,one,C1,ss)
+connect(one,R1)
+connect( one,C1)
+connect( one,ss)
+expose(ss)
 
 Se=new("Se",value=1.0)
 mainmodel = new(name='RC')
 add(mainmodel, submodel, Se)
-connect(Se,submodel.get_port("P"))
+# P=submodel.get_port("P")
+connect(Se,submodel)
 
 mainmodel.state_vars
 timespan = [0, 5]
