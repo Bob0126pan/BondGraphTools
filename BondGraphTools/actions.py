@@ -327,7 +327,9 @@ def expose(component, label=None):
     if component.__component__ != "SS":
         ss = new("SS", name=component.name)
         try:
-            swap(component, ss)
+            model.add(ss)
+            connect(component, ss)
+            
         except InvalidComponentException as ex:
             raise InvalidComponentException(f"Cannot expose {component}", ex)
     else:

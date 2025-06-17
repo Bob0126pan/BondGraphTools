@@ -6,17 +6,32 @@
       "description": "Resistor + Capacitor block",
       "class": "Composite",
       "subcomponents": {
-        "R1": {"type": "R", "value": 1.0},
-        "C1": {"type": "C", "value": 1.0},
-        "J":  {"type": "0"}
+        "R": {"type": "R", "value": 1.0},
+        "C": {"type": "C", "value": 2.0},
+        "one":  {"type": "1"}
       },
       "connections": [
-        ["R1", "J"],
-        ["C1", "J"]
+        ["R", "one"],
+        ["C", "one"]
       ],
       "expose_ports": {
-        "R1": "in"
+        "one": "P"
       }
+    },
+    "DoubleRC": {
+        "description": "Two RCBlocks in series",
+        "class": "Composite",
+        "subcomponents": {
+            "rc1": {"type": "RCBlock"},
+            "rc2": {"type": "RCBlock"}
+        },
+        "connections": [
+            
+        ],
+        "expose_ports": {
+            "rc1": "Input",
+            "rc2": "Output"
+        }
     }
   }
 }

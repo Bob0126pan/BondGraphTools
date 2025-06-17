@@ -1,84 +1,107 @@
 import json
 import BondGraphTools as bgt
 
-def build_model_from_json(json_data):
-    """
-    根据 JSON 配置构建复合元件模型
-    json_data 格式示例：
-    {
-      "name": "ThrottleValve",
-      "components": [
-        {"type": "R", "name": "FlowR", "params": {"value": 0.6}},
-        {"type": "R", "name": "LeakR", "params": {"value": 1e-8}},
-        {"type": "0", "name": "Junction"}
-      ],
-      "connections": [
-        ["FlowR", "Junction"],
-        ["LeakR", "Junction"]
-      ],
-      "exposed_ports": {
-        "FlowR": "in",
-        "LeakR": "out"
-      }
-    }
-    """
-    # 创建复合模型
-    model_name = json_data.get("name", "CompositeModel")
-    model = bgt.new(name=model_name)
+from BondGraphTools import new, add, connect, expose
+from BondGraphTools.exceptions import InvalidComponentException
 
-    # 先创建所有元件，存进字典便于引用
-    components = {}
-    for comp in json_data.get("components", []):
-        ctype = comp.get("type")
-        cname = comp.get("name")
-        params = comp.get("params", {})
-        # bgt.new 的关键字参数，value等可直接传
-        components[cname] = bgt.new(ctype, name=cname, **params)
-        bgt.add(model, components[cname])
+# class CompositeBuilder:
+#     def __init__(self, comp_def: dict, name: str = None):
+#         self.comp_def = comp_def
+#         self.name = name or comp_def.get("id", "composite_model")
+#         self.submodel = new(name=self.name)
+#         self.components = {}  # 映射名称到 BondGraphTools 元件对象
+#         self._build()
 
-    # 建立连接
-    for conn in json_data.get("connections", []):
-        # 连接两个或多个元件端口，简化默认连接全部端口
-        elems = [components[name] for name in conn]
-        bgt.connect(*elems)
+#     def _build(self):
+#         desc = self.comp_def
+#         subcomponents = desc.get("subcomponents", {})
+#         connections = desc.get("connections", [])
+#         exposed = desc.get("expose_ports", {})
 
-    # 暴露端口
-    for internal_name, alias in json_data.get("exposed_ports", {}).items():
-        if internal_name in components:
-            internal_component = components[internal_name]
-            # 暴露该元件的第一个端口
-            # 如果需要暴露具体端口，可在 JSON 中扩展字段
-            bgt.expose(model, internal_component.ports[0], alias=alias)
+#         # Step 1: 创建所有子组件
+#         for name, comp in subcomponents.items():
+#             typ = comp["type"]
+#             value = comp.get("value", None)
+#             if value is not None:
+#                 element = new(typ, value=value)
+#             else:
+#                 element = new(typ)
+#             self.components[name] = element
+#             add(self.submodel, element)
 
-    return model
+#         # Step 2: 建立连接
+#         for conn in connections:
+#             if len(conn) == 2:
+#                 connect(self.components[conn[0]], self.components[conn[1]])
+#             else:
+#                 raise ValueError(f"Invalid connection format: {conn}")
+
+#         # Step 3: 暴露端口
+#         for internal_name, port_label in exposed.items():
+#             expose(self.components[internal_name], label=port_label)
+
+#     def get_model(self):
+#         return self.submodel
 
 
-# file: subsystem_builder.py
 
-import BondGraphTools as bgt
+### 支持嵌套的子模块读取
+class CompositeBuilder:
+    def __init__(self, comp_def: dict, comp_lib: dict, name: str = None):
+        self.comp_def = comp_def
+        self.comp_lib = comp_lib
+        self.name = name or comp_def.get("id", "composite_model")
+        self.submodel = new(name=self.name)
+        self.components = {}  # 名称到组件的映射
+        self._build()
 
-def build_composite_component(spec: dict):
-    system = bgt.new(name="Composite")
+    def _create_component(self, name: str, comp_spec: dict):
+        """创建组件（支持基本类型和复合类型）"""
+        comp_type = comp_spec["type"]
+        
+        # 1. 基本组件
+        if comp_type in ["R", "C", "I", "Se", "Sf", "TF", "GY", "0", "1", "SS"]:
+            value = comp_spec.get("value", None)
+            return new(comp_type, value=value, name=name)
+        
+        # 2. 复合组件（递归构建）
+        elif comp_type in self.comp_lib.get("components", {}):
+            composite_def = self.comp_lib["components"][comp_type]
+            sub_builder = CompositeBuilder(composite_def, self.comp_lib, name)
+            return sub_builder.get_model()
+        
+        # 3. 未知组件类型
+        else:
+            raise ValueError(f"未知组件类型: {comp_type}")
 
-    components = {}
-    for name, desc in spec.get("subcomponents", {}).items():
-        comp = bgt.new(desc["type"], name=name, value=desc.get("value", {}))
-        components[name] = comp
-        bgt.add(system, comp)
+    def _build(self):
+        desc = self.comp_def
+        subcomponents = desc.get("subcomponents", {})
+        connections = desc.get("connections", [])
+        exposed = desc.get("expose_ports", {})
 
-    for connection in spec.get("connections", []):
-        elems = [components[name] for name in connection]
-        bgt.connect(*elems)
+        # Step 1: 创建所有子组件
+        for name, comp_spec in subcomponents.items():
+            component = self._create_component(name, comp_spec)
+            self.components[name] = component
+            add(self.submodel, component)
 
-    for comp_name, port_alias in spec.get("expose_ports", {}).items():
-        comp = components[comp_name]
-        from BondGraphTools.actions import _unpack_port_arg
-        component, port=_unpack_port_arg(comp)  # 确保端口被正确解析
-        port = comp.ports.get("e") or next(iter(comp.ports.values()))
-        bgt.expose(system, port, alias=port_alias)
+        # Step 2: 建立连接（只需处理当前层组件）
+        for conn in connections:
+            if len(conn) == 2:
+                src, dest = conn
+                connect(self.components[src], self.components[dest])
+            else:
+                raise ValueError(f"无效连接格式: {conn}")
 
-    return system
+        # Step 3: 暴露端口（只需处理当前层组件）
+        for comp_name, port_label in exposed.items():
+            component = self.components[comp_name]
+            expose(component, label=port_label)
 
+    def get_model(self):
+        return self.submodel 
+    
 # 用法示例
 if __name__ == "__main__":
     # 从文件读配置（可根据需要替换为你的json路径）
@@ -86,15 +109,59 @@ if __name__ == "__main__":
     with open(os.path.join(os.path.dirname(__file__), "RC.json"), "r") as f:
         data = json.load(f)
 
-    # model = build_model_from_json(data)
-    # print(model)
+    from matplotlib import pyplot as plt
 
-    
-    rc_block = build_composite_component(data["components"]["RCBlock"])
+    comp_lib=data
+    # 构建嵌套复合模块
+    builder = CompositeBuilder(
+        comp_def=comp_lib["components"]["RCBlock"],
+        comp_lib=comp_lib,
+        name="MyDoubleRC"
+    )
+    double_rc_model = builder.get_model()
 
-    # 用法示例
-    model = bgt.new()
-    source = bgt.new("Se", value=1.0)
-    bgt.add(model, rc_block, source)
-    bgt.connect(source, rc_block)
-    bgt.draw(model)
+    # testsimple rc
+    Se=new("Se",value=1.0)
+    mainmodel = new(name='RC')
+    add(mainmodel, double_rc_model, Se)
+    connect(Se,double_rc_model.get_port('P'))
+
+    mainmodel.state_vars
+    timespan = [0, 5]
+    x0 = {'x_0':1}
+    t, x = bgt.simulate(mainmodel, timespan=timespan, x0=x0)
+    import matplotlib.pyplot as plt
+
+    plt.plot(t,x)
+    plt.show()
+    plt.savefig("RC_2.svg", pad_inches=0, bbox_inches="tight")
+
+    # # 构建主模型，并连接一个 Se 元件
+    # mainmodel = new(name="MainModel")
+    # Se = new("Se", value=1.0)  # 恒压源
+    # load = new("R", value=1.0, name="load_resistor")
+    # one = new("0")  # 连接点
+    # add(mainmodel, Se, double_rc_model, load, one)
+
+    # connect(one, double_rc_model.get_port('Input'))  # 自动连接暴露端口 Input
+    # connect(one,double_rc_model.get_port('Output'))  # 自动连接暴露端口 Output
+    # connect(one, Se)  # 连接恒压源到输入端口
+    # connect(one, load)  # 连接输出到负载电阻
+
+    # # 初始化、仿真
+    # x0 = {'x_0': 1.0, 'x_1': 0.5}  # 2 个电容器初值
+    # tspan = [0, 5]
+
+    # t, x = bgt.simulate(mainmodel, timespan=tspan, x0=x0)
+
+    # # 绘图
+    # plt.plot(t, x[:, 0], label='C1 voltage')
+    # plt.plot(t, x[:, 1], label='C2 voltage')
+    # plt.xlabel("Time")
+    # plt.ylabel("State variables")
+    # plt.title("Double RC Block Simulation")
+    # plt.legend()
+    # plt.grid()
+    # plt.tight_layout()
+    # plt.savefig("double_rc_sim.svg")
+    # plt.show()
