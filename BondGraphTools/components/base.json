@@ -5,7 +5,8 @@
     "0": {
       "description": "Equal Effort Node",
       "metamodel": "0",
-      "class": "EqualEffort"
+      "class": "EqualEffort",
+      "type": "base"
     },
     "1": {
       "description": "Equal Flow Node",
@@ -16,6 +17,7 @@
       "description": "Generalised Linear Resistor",
       "class": "Component",
       "metamodel":"R",
+      "type": "base",
       "ports": {
         "0": null
       },
@@ -37,6 +39,7 @@
       "description": "Generalised Linear Capacitor",
       "class": "Component",
       "metamodel":"C",
+      "type": "base",
       "ports": {
         "0": null
       },

@@ -1,0 +1,82 @@
+{
+  "id": "elecSubmodel",
+  "description": "My Custom Components",
+  "components": {
+    "RCBlock": {
+      "description": "Resistor + Capacitor block",
+      "name": "RCBlock",
+      "class": "Composite",
+      "subcomponents": {
+        "R": { "type": "base.R", "value": {"r": 100000}},
+        "C1": {"type": "base.C", "value": {"C": 0.00010}},
+        "one": {"type": "base.1"}
+      },
+      "connections": [
+        ["C1", "one"],
+        ["one", "R"]
+      ],
+      "expose_ports": {
+        "one": "P"
+      }
+    },
+    
+    "DoubleRC": {
+        "description": "Two RCBlocks in series",
+        "name": "DoubleRC",
+        "class": "Composite",
+        "subcomponents": {
+            "rc1": {"type": ".RCBlock",
+                  "value": {
+                    "R.r": 100000,
+                    "C1.C": 0.00015
+                  }
+          },
+            "R2": {"type": "base.R", "value": {"r": 10000}},
+            "C2": {"type": "base.C", "value": {"C": 0.00022}},
+            "zero": {"type": "base.0"},
+            "one": {"type": "base.1"}
+        },
+        "connections": [
+            ["rc1", "zero"],
+            ["zero", "one"],
+            ["one", "R2"],
+            ["one", "C2"]
+
+        ],
+        "expose_ports": {
+            "zero": "P"
+            
+        }
+    },
+    "DoubleRC1": {
+        "description": "Two RCBlocks in series",
+        "name": "DoubleRC1",
+        "class": "Composite",
+        "subcomponents": {
+            "rc1": {"type": ".RCBlock",
+                  "value": {
+                    "R.r": 100000,
+                    "C1.C": 0.00015
+                  }
+          },
+          "rc2": {"type": ".RCBlock",
+                  "value": {
+                    "R.r": 10000,
+                    "C1.C": 0.00022
+                  }
+                },
+            "zero": {"type": "base.0"}
+        },
+        "connections": [
+            ["rc1", "zero"],
+            ["zero", "rc2"]
+
+        ],
+        "expose_ports": {
+            "zero": "P"
+            
+        }
+    }
+  }
+}
+

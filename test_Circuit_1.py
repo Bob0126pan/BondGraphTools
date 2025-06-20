@@ -44,3 +44,17 @@ plt.ylabel("Flow (Coulomb/s)")
 plt.legend(loc='upper right')
 plt.grid()
 plt.show()
+
+u_R=R._params['r']*v_C2
+u_C1=x[:,0]/C1._params['C']
+u_C2=x[:,1]/C2._params['C']
+
+for u, c, label in [(u_C1,'-r','u_C1'), (u_C2,'-b','u_C2'), (u_R,'-g','u_R')]:
+    fig=plt.plot(t,u,c,label=label)
+    plt.legend(loc='upper right')
+    
+plt.grid()
+plt.xlabel("time (s)")
+plt.ylabel("Potential (J/Coulomb)")
+
+plt.show()

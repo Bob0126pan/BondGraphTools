@@ -16,6 +16,7 @@ from BondGraphTools.port_managers import PortTemplate
 from .atomic import EqualFlow
 
 
+
 logger = logging.getLogger(__name__)
 
 __all__ = [
@@ -259,6 +260,57 @@ def new(component=None, name=None, library=base_id, value=None, **kwargs):
             "New not implemented for object {}", component
         )
 
+
+def new_extended(comp_type: str, value=None, name=None):
+    """
+    一个增强版 new()：
+    - 支持基本组件（直接调用 BondGraphTools.new）
+    - 支持复合模块（在 lib 中递归构建 CompositeBuilder）
+    """
+    lib, comp = comp_type.rsplit('.', 1)
+    # 1. 直接创建基本组件
+    if lib in ['base','BioChem','elec']: 
+        return new(comp, value=value, name=name,library=lib)
+
+    try:
+        comp_spec = get_component(comp, lib)
+        if name:
+            comp_spec["name"] = name
+            
+        from BondGraphTools.ultis import set_parameters
+
+        # 准备参数副本（避免修改原始输入）
+        params_copy = {k: v for k, v in (value or {}).items()}
+        
+        # 应用参数update到复合组件规范
+        comp_spec=set_parameters(comp_spec, params_copy, prefix="")
+        
+        # 构建复合组件
+        from .submodelManage import CompositeBuilder
+        builder = CompositeBuilder(comp_spec, comp_lib=lib)
+        return builder.get_model()
+    except Exception as e:
+        raise ValueError(f"未知组件类型: {comp_type}") from e
+    # 2. 创建复合组件
+    # else:
+    #     try:
+    #         comp_spec = get_component(comp, lib)
+    #         params = comp_spec.get("params", {})
+    #         # 更新 default 复合定义中的 subcomponent 参数
+    #         for subname, subparams in params.items():
+    #             if subname in comp_spec["subcomponents"]:
+    #                 comp_spec["subcomponents"][subname].update(subparams)
+            
+    #         # 注入模型名称（如有）
+    #         if name:
+    #             comp_spec.update({"name": name})
+
+    #         from .submodelManage import CompositeBuilder
+
+    #         builder = CompositeBuilder(comp_spec, comp_lib=lib)
+    #         return builder.get_model()
+    #     except Exception as e:
+    #         raise ValueError(f"未知组件类型: {comp_type}") from e
 
 def _update_build_params(args, build_args, value, **kwargs):
 
