@@ -60,7 +60,7 @@ def testRCSubmodel():
     C2 = new_extended("base.C", value={'C':1e-3})
     C3 = new_extended("BioChem.Ce",value={'k':1, 'R':1, 'T':1})
     # 创建复合模块 RCBlock（通过lib）
-    double_rc_model = new_extended("elecSubmodel.RCBlock", value={"R.r": 100000, "C1.C": 0.00015}, name="my_rc")
+    double_rc_model = new_extended("elecSubmodel.RCBlock", value={"R.r": 100000, "C1.C": 0.0001}, name="my_rc")
     print(double_rc_model.components[1].params)
 
     C2=new("C", value=100*1e-6)
@@ -91,7 +91,7 @@ def testRCSubSubmodel():
     from BondGraphTools import add, connect, expose
     # 创建基本电容
     # 创建复合模块 RCBlock（通过lib）
-    double_rc_model = new_extended("elecSubmodel.DoubleRC1", value={"rc1.R.r": 100000, "rc1.C1.C": 0.00015,"rc2.R.r": 10000, "rc2.C2.C": 0.00022}, name="my_rc")
+    double_rc_model = new_extended("elecSubmodel.DoubleRC1", value={"rc1.R.r": 10000, "rc1.C1.C": 0.015,"rc2.R.r": 1000, "rc2.C1.C": 0.0022}, name="my_rc")
     print(double_rc_model.components[1].params)
 
     C2=new("C", value=100*1e-6)

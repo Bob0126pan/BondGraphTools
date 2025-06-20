@@ -9,9 +9,8 @@ from BondGraphTools.exceptions import InvalidComponentException
 
 ### 支持嵌套的子模块读取
 class CompositeBuilder:
-    def __init__(self, comp_def: dict, comp_lib: dict):
+    def __init__(self, comp_def: dict):
         self.comp_def = comp_def
-        self.comp_lib = comp_lib
         self.name = comp_def.get("name")
         self.submodel = new(name=self.name)
         self.components = {}  # 名称到组件的映射
@@ -28,26 +27,16 @@ class CompositeBuilder:
             return new(comp, value=value, name=name,library=lib)
         
         # 2. 复合组件（递归构建）
-        elif comp in self.comp_lib.get("components", {}):
-            # 支持传递子参数
-            composite_def = self.comp_lib["components"][comp].copy()
+
+        try:
+            from BondGraphTools.actions import new_extended
             user_params = comp_spec.get("value", {})
-            # 递归合并嵌套参数
-            from BondGraphTools.ultis import set_parameters
-
-             # 创建合并后的参数字典
-            merged_params = set_parameters(composite_def.copy(), user_params)
-
-            # 更新 default 复合定义中的 subcomponent 参数
-            # for subname, subparams in params.items():
-            #     if subname in composite_def["subcomponents"]:
-            #         composite_def["subcomponents"][subname].update(subparams)
-            sub_builder = CompositeBuilder(merged_params, self.comp_lib)
-            return sub_builder.get_model()
+            return new_extended(comp_type,value=user_params, name=name)
         
         # 3. 未知组件类型
-        else:
-            raise ValueError(f"未知组件类型: {comp_type}")
+        except Exception as e:
+            raise InvalidComponentException(f"无法创建组件 {name} ({comp_type}): {str(e)}")
+        #     raise ValueError(f"未知组件类型: {comp_type}")
 
     def _build(self):
         desc = self.comp_def
@@ -120,9 +109,7 @@ if __name__ == "__main__":
 
     ### 测试嵌套复合模块1   ## 这个测试DoubleRC有问题
     builder = CompositeBuilder(
-        comp_def=comp_lib["components"]["DoubleRC1"],  
-        comp_lib=comp_lib,
-        # name="MyDoubleRC"
+        comp_def=comp_lib["components"]["DoubleRC1"]
     )
     #test RC 模型
     double_rc_model = builder.get_model()

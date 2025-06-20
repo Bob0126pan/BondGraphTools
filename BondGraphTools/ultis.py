@@ -22,8 +22,7 @@ def set_parameters(spec, params, prefix=""):
     # 设置当前组件的直接参数
     if prefix == "":  # 只在最顶层处理直接参数
         for key, val in params.items():
-            if '.' not in key:  # 直接参数（无点号）
-                if "value" not in spec:
-                    spec["value"] = {}
-                spec["value"][key] = val
-    return spec
+            # if '.' not in key:  # 直接参数（无点号）
+            #     if "value" not in spec:
+            #         spec["value"] = {}
+            spec["value"][key] = val

@@ -283,11 +283,11 @@ def new_extended(comp_type: str, value=None, name=None):
         params_copy = {k: v for k, v in (value or {}).items()}
         
         # 应用参数update到复合组件规范
-        comp_spec=set_parameters(comp_spec, params_copy, prefix="")
+        set_parameters(comp_spec, params_copy, prefix="")
         
         # 构建复合组件
         from .submodelManage import CompositeBuilder
-        builder = CompositeBuilder(comp_spec, comp_lib=lib)
+        builder = CompositeBuilder(comp_spec)
         return builder.get_model()
     except Exception as e:
         raise ValueError(f"未知组件类型: {comp_type}") from e

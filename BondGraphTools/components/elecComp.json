@@ -25,7 +25,7 @@
         "name": "DoubleRC",
         "class": "Composite",
         "subcomponents": {
-            "rc1": {"type": ".RCBlock",
+            "rc1": {"type": "elecSubmodel.RCBlock",
                   "value": {
                     "R.r": 100000,
                     "C1.C": 0.00015
@@ -53,13 +53,13 @@
         "name": "DoubleRC1",
         "class": "Composite",
         "subcomponents": {
-            "rc1": {"type": ".RCBlock",
+            "rc1": {"type": "elecSubmodel.RCBlock",
                   "value": {
                     "R.r": 100000,
                     "C1.C": 0.00015
                   }
           },
-          "rc2": {"type": ".RCBlock",
+          "rc2": {"type": "elecSubmodel.RCBlock",
                   "value": {
                     "R.r": 10000,
                     "C1.C": 0.00022
