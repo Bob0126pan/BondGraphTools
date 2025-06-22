@@ -117,4 +117,4 @@ def testRCSubSubmodel():
     plt.show()
 
 
-testRCSubSubmodel()
+testRCBasic()
