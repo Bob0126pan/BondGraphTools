@@ -6,10 +6,11 @@ from scipy.optimize import fsolve
 import re
 from scipy.integrate import solve_ivp
 from scipy import interpolate
+import warnings
 
 def solve_state_equations(equations, known_data, params=None):
     """
-    基于DAE求解器的状态方程求解器
+    改进的状态方程求解器，充分利用已知时间序列数据
     
     参数:
     equations: 状态方程列表 (字符串表达式), 形式为['表达式1 = 0', '表达式2 = 0']
@@ -78,9 +79,18 @@ def solve_state_equations(equations, known_data, params=None):
     var_map = {}
     inv_var_map = {}
     state_var_list = []
+    known_var_indices = {}  # 存储已知变量的索引
     
-    # 添加状态变量
-    for i, var in enumerate(state_vars):
+    # 添加状态变量 - 只添加未知的状态变量
+    unknown_state_vars = []
+    for var in state_vars:
+        var_str = str(var)
+        if var_str not in known_data or var_str == 't':
+            # 只有未知变量才作为状态变量
+            unknown_state_vars.append(var)
+    
+    # 为未知状态变量创建映射
+    for i, var in enumerate(unknown_state_vars):
         var_map[var] = X[i]
         inv_var_map[X[i]] = var
         state_var_list.append(var)
@@ -106,77 +116,155 @@ def solve_state_equations(equations, known_data, params=None):
     
     # 创建残差函数的lambda表达式
     t_sym = sp.Symbol('t')
-    n_states = len(state_vars)
+    n_states = len(unknown_state_vars)
+    
+    # 为已知变量创建插值函数
+    interp_funcs = {}
+    for var in known_vars:
+        if var != 't' and var in known_data:
+            # 创建线性插值函数
+            interp_funcs[var] = interpolate.interp1d(
+                t_data, known_data[var], 
+                kind='linear', fill_value="extrapolate"
+            )
     
     # 创建残差函数
-    F = sp.lambdify((t_sym, [X[i] for i in range(n_states)], [dX[i] for i in range(n_states)]), residuals, modules='numpy')
-    
-    # 定义DAE残差函数
     def residual_func(t, y, yp):
-        # y是状态变量值, yp是状态变量的导数
-        # 我们需要同时满足残差方程
-        res = np.zeros_like(y)
-        result = F(t, y, yp)
-        for i in range(len(result)):
-            res[i] = result[i]
+        # 准备变量值字典
+        var_values = {}
+        
+        # 添加时间
+        var_values[t_sym] = t
+        
+        # 添加已知变量的值（通过插值）
+        for var, func in interp_funcs.items():
+            var_values[sp.Symbol(var)] = func(t)
+        
+        # 添加未知状态变量及其导数
+        for i in range(n_states):
+            var_values[X[i]] = y[i]
+            var_values[dX[i]] = yp[i]
+        
+        # 计算残差
+        res = np.zeros(n_states)
+        for i, eq in enumerate(residuals):
+            try:
+                # 使用数值计算残差
+                res[i] = float(eq.evalf(subs=var_values))
+            except Exception as e:
+                warnings.warn(f"Error evaluating equation {i} at t={t}: {str(e)}")
+                res[i] = 0.0
+        
         return res
     
     # 准备初始条件
-    # 使用第一个时间点的值作为初始猜测
     y0 = np.zeros(n_states)
     yp0 = np.zeros(n_states)
     
-    # 填充已知变量
-    for i, var in enumerate(state_var_list):
-        if str(var) in known_data:
-            y0[i] = known_data[str(var)][0]
-    
-    # 对于导数变量，使用数值微分估计初始导数
-    for deriv_sym, base_var in derivative_vars.items():
-        base_sym = sp.Symbol(base_var)
-        if base_sym in var_map:
-            idx = list(var_map.keys()).index(sp.symbols(base_var))
-            # 使用前向差分估计初始导数
-            if n_points > 1:
-                dt = t_data[1] - t_data[0]
-                yp0[idx] = (known_data[base_var][1] - known_data[base_var][0]) / dt
+    # 填充未知状态变量的初始值
+    for i, var in enumerate(unknown_state_vars):
+        var_str = str(var)
+        # 如果没有提供初始值，使用0
+        if var_str in known_data:
+            y0[i] = known_data[var_str][0]
+        else:
+            y0[i] = 0.0
     
     # 设置DAE求解器选项
     # 使用BDF方法，适合刚性问题
-    sol = solve_ivp(
-        lambda t, y: residual_func(t, y, np.zeros_like(y)),  # 对于DAE，我们需要特殊的处理
-        [t_data[0], t_data[-1]],
-        y0,
-        method='BDF',
-        t_eval=t_data,
-        vectorized=True
-    )
-    
-    # 检查求解是否成功
-    if not sol.success:
-        raise RuntimeError(f"DAE求解失败: {sol.message}")
+    if n_states > 0:
+        # 只有存在未知状态变量时才需要求解
+        sol = solve_ivp(
+            lambda t, y: residual_func(t, y, np.zeros_like(y)),  # Dummy derivative
+            [t_data[0], t_data[-1]],
+            y0,
+            method='BDF',
+            t_eval=t_data,
+            vectorized=False
+        )
+        
+        # 检查求解是否成功
+        if not sol.success:
+            warnings.warn(f"DAE求解警告: {sol.message}")
+    else:
+        # 没有未知状态变量，创建空解
+        sol = type('', (), {})()
+        sol.y = np.zeros((0, len(t_data)))
+        sol.t = t_data
     
     # 提取结果
     result = {'t': t_data.tolist()}
     
-    # 添加状态变量结果
-    for i, var in enumerate(state_var_list):
+    # 添加未知状态变量结果
+    for i, var in enumerate(unknown_state_vars):
         result[str(var)] = sol.y[i].tolist()
     
-    # 添加已知数据（可能包含不在状态变量中的量）
+    # 添加已知数据（覆盖插值值）
     for k, v in known_data.items():
-        if k != 't' and k not in result:
+        if k != 't':
             result[k] = v
     
     # 计算并添加导数变量
     for deriv_sym, base_var in derivative_vars.items():
         base_sym = sp.Symbol(base_var)
-        if base_sym in var_map:
-            idx = list(var_map.keys()).index(sp.symbols(base_var))
+        base_str = str(base_sym)
+        
+        if base_str in result:
             # 使用样条插值计算导数
-            cs = CubicSpline(t_data, sol.y[idx])
+            cs = CubicSpline(t_data, result[base_str])
             deriv_vals = cs(t_data, 1)
             result[str(deriv_sym)] = deriv_vals.tolist()
+        elif base_str in known_data:
+            # 使用已知数据计算导数
+            cs = CubicSpline(t_data, known_data[base_str])
+            deriv_vals = cs(t_data, 1)
+            result[str(deriv_sym)] = deriv_vals.tolist()
+    
+    # 对于非状态变量和导数变量的方程，使用代数求解
+    algebraic_vars = state_vars - set(unknown_state_vars) - set(derivative_vars.keys())
+    
+    if algebraic_vars:
+        # 创建代数求解的符号表达式
+        algebraic_eqs = [eq.subs(param_subs) for eq in sym_equations]
+        
+        # 为每个时间点求解代数方程
+        for var in algebraic_vars:
+            result[str(var)] = np.zeros(n_points)
+        
+        for i in range(n_points):
+            # 当前时间点的所有已知值
+            current_vals = {
+                't': t_data[i]
+            }
+            for k in result:
+                if k != 't' and k in result:
+                    current_vals[k] = result[k][i]
+            
+            # 尝试符号求解
+            try:
+                sol_dict = sp.solve(algebraic_eqs, list(algebraic_vars), dict=True)
+                if sol_dict:
+                    for var in algebraic_vars:
+                        expr = sol_dict[0].get(var, 0)
+                        if expr:
+                            # 代入当前值
+                            value = expr.subs(current_vals)
+                            try:
+                                result[str(var)][i] = float(value)
+                            except TypeError:
+                                result[str(var)][i] = float(sp.re(value))
+            except Exception:
+                # 符号求解失败，使用数值求解
+                def algebraic_func(x):
+                    subs_dict = dict(zip(algebraic_vars, x))
+                    subs_dict.update(current_vals)
+                    return [float(eq.subs(subs_dict)) for eq in algebraic_eqs]
+                
+                x0 = [result[str(var)][i-1] if i > 0 else 0 for var in algebraic_vars]
+                sol = fsolve(algebraic_func, x0)
+                
+                for j, var in enumerate(algebraic_vars):
+                    result[str(var)][i] = sol[j]
     
     return result
 

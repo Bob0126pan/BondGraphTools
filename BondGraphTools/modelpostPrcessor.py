@@ -72,6 +72,8 @@ class BondGraphPostProcessor:
                 expr = sp.sympify(rel)
                 unknowns = [str(s) for s in expr.free_symbols 
                           if f"{component.name}_{str(s)}" not in self.results]
+                knows= [str(s) for s in expr.free_symbols
+                        if f"{component.name}_{str(s)}" in self.results]
                 
                 # 只有一个未知量时求解
                 if len(unknowns) == 1:
@@ -79,7 +81,7 @@ class BondGraphPostProcessor:
                     param_dict = {k: v for k, v in component.params.items()}
                     known_dict = {
                         k: self.results[f"{component.name}_{k}"] 
-                        for k in all_vars if k != unknowns[0]
+                        for k in knows
                     }
                     
                     # 向量化求解
