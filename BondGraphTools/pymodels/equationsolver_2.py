@@ -2,6 +2,8 @@ import sympy as sp
 from collections import deque, defaultdict
 from typing import Dict, List, Set, Tuple, Union, Optional
 
+## 这个方程是可能比较复杂的方程求解器 本项目暂时不用，其他的用
+
 class EquationSolver:
     def __init__(self, equations: List[sp.Eq], known_vars: Dict[sp.Symbol, float], 
                  parameters: Dict[sp.Symbol, float], independent_var: sp.Symbol = sp.symbols('t')):
@@ -465,7 +467,7 @@ def test_step_solve_system():
     dq_0 = sp.diff(q_0,t)
     
     # 创建方程
-    eq1 = sp.Eq(dq_0+q_0+1 , f_0)
+    eq1 = sp.Eq(dq_0+q_0+e_0 , f_0)
     eq2 = sp.Eq(q_0 , C * e_0)
     # eq3 = sp.Eq(x + 2*y - z, a)
     

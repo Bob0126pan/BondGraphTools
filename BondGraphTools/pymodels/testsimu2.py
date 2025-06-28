@@ -5,108 +5,61 @@ import sympy as sp
 import numpy as np
 from scipy.interpolate import CubicSpline
 
-def solve_dae_with_knowns(equations, known_data, params=None):
-    # 提取时间数据
-    t_data = known_data['t']
-    n_points = len(t_data)
-    
-    # 构建所有符号
-    all_symbols = set()
-    for eq in equations:
-        all_symbols.update(eq.free_symbols)
-    
-    # 分离常数参数和变量
-    params = params or {}
-    param_syms = {sp.symbols(k) for k in params.keys()}
-    variable_syms = list(all_symbols - param_syms)
+def solve_dae_with_knowns(equations, known_vars, parameters):
+    """
+    使用已知变量和参数求解微分代数方程组
+    :param equations: 方程列表
+    :param known_vars: 已知变量字典 {var_name: values}
+    :param parameters: 参数字典 {param_name: value}
+    :return: 求解后的变量字典 {var_name: values}
+    """
+    solutions=sp.solve(equations, [e_0, f_0])
+    dt=1
+    for unknowvar in solutions:
+        for func in solutions[unknowvar].atoms(sp.Derivative):
+            if func.expr in known_vars:
+                # 替换微分符号为对应的函数
+                import  numpy as np
+                value=np.gradient(known_vars[func.expr],dt)
+                known_vars[func] = list(value)
+        # 代入已知值和参数
+        for i in range(3):
+            # 代入已知值和参数
+            substituted_dict=  {
+                    k: v[i] if isinstance(v, list) else v
+                    for k, v in known_vars.items()
+                }
+            value = solutions[unknowvar].subs(substituted_dict).subs(parameters)
+            
+            # 如果是简单表达式则计算数值
+            if value.is_constant():
+                value = value.evalf()
+            varlist = value
+            
+        known_vars[unknowvar] = value
 
-    # 区分状态变量（可随时间变化）和其它变量
-    time_varying_vars = []
-    other_vars = []
-
-    for sym in variable_syms:
-        if any(str(sym).endswith(f"_{i}") for i in range(10)) or str(sym).startswith("d"):
-            other_vars.append(sym)
-        else:
-            time_varying_vars.append(sym)
-
-    # 构造插值函数
-    interpolators = {}
-    for var_name, values in known_data.items():
-        if var_name == 't':
-            continue
-        var_sym = sp.symbols(var_name)
-        if var_sym in all_symbols:
-            interpolators[var_sym] = CubicSpline(t_data, values)
-
-    # 替换参数
-    subs_dict = {sp.symbols(k): v for k, v in params.items()}
-
-    # 替换已知变量为插值函数
-    numeric_equations = []
-    for eq in equations:
-        eq_subbed = eq.subs({
-            var: interpolators[var](t_data) if var in interpolators else var
-            for var in eq.free_symbols
-        })
-        numeric_equations.append(eq_subbed)
-
-    # 解代数方程
-    algebraic_solutions = {}
-    for eq in numeric_equations:
-        lhs, rhs = eq.lhs, eq.rhs
-        if lhs.is_Function and rhs != 0:
-            var = lhs.func(*lhs.args[:-1]) if lhs.is_Function else lhs
-            algebraic_solutions[lhs] = rhs
-        elif rhs.is_Function and lhs != 0:
-            var = rhs.func(*rhs.args[:-1]) if rhs.is_Function else rhs
-            algebraic_solutions[rhs] = lhs
-
-    # 计算所有变量的值
-    results = {'t': t_data.tolist()}
-    
-    # 添加已知变量
-    for name, data in known_data.items():
-        if name != 't':
-            results[name] = data.tolist()
-
-    # 求解代数变量
-    for var, expr in algebraic_solutions.items():
-        try:
-            # 替换所有已知变量
-            val = expr.evalf(subs=subs_dict)
-            if isinstance(val, sp.Matrix):
-                val = val.tolist()
-            results[str(var)] = val
-        except Exception as e:
-            print(f"无法计算 {var}: {str(e)}")
-
-    return results
 
 # === Step 1: 符号定义（与你之前的代码一致）===
-t_sym = sp.symbols('t')
-q_0_sym = sp.Function('q_0')(t_sym)
-dq_0_sym = sp.diff(q_0_sym, t_sym)
-f_0_sym = sp.Function('f_0')(t_sym)
-e_0_sym = sp.Function('e_0')(t_sym)
-C = sp.symbols('C')
+t = sp.symbols('t')
+C= sp.symbols('C')
+q_0 = sp.Function('q_0')(t)
+e_0 = sp.Function('e_0')(t)
+f_0 = sp.Function('f_0')(t)
+dq_0 = sp.diff(q_0,t)
 
-equations = [
-   sp.Eq(dq_0_sym, f_0_sym),        # dq_0 = f_0
-   sp.Eq(q_0_sym - C * e_0_sym, 0)    # q_0 = C * e_0
-]
+# 创建方程
+eq1 = sp.Eq(dq_0+q_0 , f_0)
+eq2 = sp.Eq(q_0 , C * e_0)
+# eq3 = sp.Eq(x + 2*y - z, a)
 
-known_data = {
-    't': np.array([0, 0.1, 0.2, 0.3, 0.4]),
-    'q_0': np.array([0, 1, 2, 3, 4])
-}
-
-params = {
-    'C': 2.0
-}
-
-results = solve_dae_with_knowns(equations, known_data, params)
-
-# 打印结果
-for var, values in results.items():
-    print(f"{var}: {values}")
+# 已知变量和参数
+known_vars = {q_0: [2,2,3],t:[0,1,2]}
+parameters = {C:1}
+equations = [eq1, eq2]
+solutions=sp.solve([eq1, eq2], [e_0, f_0])
+known_vars[dq_0] = list(np.gradient(known_vars[q_0], 1))  # 假设 dt=1
+dt=1
+sub_solutions = [ v.subs(parameters) for k, v in solutions.items()]
+f=sp.lambdify(tuple(known_vars.keys()), sub_solutions, modules='numpy')
+arrayvalue=tuple(np.array(known_vars[var]) for var in known_vars.keys())
+value=f(*arrayvalue)

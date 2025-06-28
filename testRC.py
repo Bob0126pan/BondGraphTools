@@ -3,13 +3,15 @@ def testRCBasic():
     model = new(name='RC')
     C = new("C", value=1.0)
     R = new("R", value=1.0)
+    I = new("I", value=1.0)
     se = new("Se", value=1.0)
     one = new("1")
     from BondGraphTools import add, connect, expose
-    add(model, R,C,one,se)
+    add(model, R,C,one,se,I)
     connect(se,one)
     connect(R,one)
     connect(C,one)
+    connect(I,one)
     model.state_vars
     timespan = [0, 5]
     x0 = {'x_0':1}
@@ -117,4 +119,4 @@ def testRCSubSubmodel():
     plt.show()
 
 
-testRCSubSubmodel()
+testRCBasic()
