@@ -1,0 +1,34 @@
+{
+  "id": "fluidSubmodel",
+  "description": "My Custom Components",
+  "components": {
+    "Tube": {
+      "description": "Tube Model containing R, C, and I elements",
+      "name": "Tube",
+      "class": "Composite",
+      "subcomponents": {
+        "C": {"type": "base.C", "value": {"C": 0.60015e-6}},
+        "R1": { "type": "base.R", "value": {"r": 10.664e-6}},
+        "R2": { "type": "base.R", "value": {"r": 10.664e-6}},
+        "I1": { "type": "base.I", "value": {"L": 0.06665e6}},
+        "I2": { "type": "base.I", "value": {"L": 0.06665e6}},
+        "zero": {"type": "base.0"},
+        "one1": {"type": "base.1"},
+        "one2": {"type": "base.1"}
+      },
+      "connections": [
+        ["one1", "R1"],
+        ["one1", "I1"],
+        ["one1", "zero"],
+        ["zero", "one2"],
+        ["zero", "C"],
+        ["one2", "R2"],
+        ["one2", "I2"]
+      ],
+      "expose_ports": {
+        "one1": "one1",
+        "one2": "one2"
+      }
+    }
+    }
+}

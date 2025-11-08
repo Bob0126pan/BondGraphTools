@@ -69,6 +69,8 @@ class CompositeBuilder:
 # 用法示例
 if __name__ == "__main__":
     # 从文件读配置（可根据需要替换为你的json路径）
+    # from joblib import Parallel, delayed, cpu_count
+
     import os
     with open(os.path.join(os.path.dirname(__file__),"components", "elecComp.json"), "r") as f:
         data = json.load(f)
