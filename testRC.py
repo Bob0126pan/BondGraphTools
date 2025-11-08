@@ -116,17 +116,29 @@ def testRCSubmodel():
     x0 = {'x_0':1, 'x_1':0}  # 初始状态变量
     print(mainmodel.constitutive_relations)
     t, x = simulate(mainmodel, timespan=timespan, x0=x0)
-    
-    import matplotlib.pyplot as plt
 
-    plt.plot(t,x[:,0], '-b', label='q_C1')
-    plt.plot(t,x[:,1], '-r', label='q_C2')
-    # plt.plot(t,x[:,2], '-g', label='q_C3')
-    plt.xlabel("time (s)")
-    plt.ylabel("electric charge (Coulomb)")
-    plt.legend(loc='upper right')
-    plt.grid()
-    plt.show()
+    post = BondGraphPost(mainmodel, (t, x))
+
+    
+    # 4. 查看组件层次
+    post.list_components()
+
+    # 5. 获取子模型数据
+    submodel_data = post.get_component('my_rc')
+
+    post.plot_component('my_rc.C1')
+    post.plot_component('my_rc.C8')
+    
+    # import matplotlib.pyplot as plt
+
+    # plt.plot(t,x[:,0], '-b', label='q_C1')
+    # plt.plot(t,x[:,1], '-r', label='q_C2')
+    # # plt.plot(t,x[:,2], '-g', label='q_C3')
+    # plt.xlabel("time (s)")
+    # plt.ylabel("electric charge (Coulomb)")
+    # plt.legend(loc='upper right')
+    # plt.grid()
+    # plt.show()
 
 def testRCSubSubmodel():
     from BondGraphTools.actions import new,new_extended
@@ -147,17 +159,29 @@ def testRCSubSubmodel():
     x0 = {'x_0':1, 'x_1':0,'x_2':0}  # 初始状态变量
     print(mainmodel.constitutive_relations)
     t, x = simulate(mainmodel, timespan=timespan, x0=x0)
-    
-    import matplotlib.pyplot as plt
 
-    plt.plot(t,x[:,0], '-b', label='q_C1')
-    plt.plot(t,x[:,1], '-r', label='q_C2')
-    plt.plot(t,x[:,2], '-g', label='q_C3')
-    plt.xlabel("time (s)")
-    plt.ylabel("electric charge (Coulomb)")
-    plt.legend(loc='upper right')
-    plt.grid()
-    plt.show()
+    post = BondGraphPost(mainmodel, (t, x))
+
+    
+    # 4. 查看组件层次
+    post.list_components()
+
+    # 5. 获取子模型数据
+    submodel_data = post.get_component('my_rc')
+
+    post.plot_component('my_rc.rc2.R')
+    post.plot_component('my_rc.rc1.C1')
+    
+    # import matplotlib.pyplot as plt
+
+    # plt.plot(t,x[:,0], '-b', label='q_C1')
+    # plt.plot(t,x[:,1], '-r', label='q_C2')
+    # plt.plot(t,x[:,2], '-g', label='q_C3')
+    # plt.xlabel("time (s)")
+    # plt.ylabel("electric charge (Coulomb)")
+    # plt.legend(loc='upper right')
+    # plt.grid()
+    # plt.show()
 
 
 def test_Tube():
@@ -179,15 +203,27 @@ def test_Tube():
     x0={"x_0":5*1e-6, "x_1":0, "x_2":0} # 初始状态变量
     print(mainmodel.constitutive_relations)
     t, x = simulate(mainmodel, timespan=timespan, x0=x0)
-    
-    import matplotlib.pyplot as plt
 
-    plt.plot(t,x[:,0], '-b', label='q_C')
-    plt.xlabel("time (s)")
-    plt.ylabel("fluid volume (m^3)")
-    plt.legend(loc='upper right')
-    plt.grid()
-    plt.show()
+    post = BondGraphPost(mainmodel, (t, x))
+
+    
+    # 4. 查看组件层次
+    post.list_components()
+
+    # 5. 获取子模型数据
+    submodel_data = post.get_component('my_rc')
+
+    post.plot_component('my_tube.C')
+    post.plot_component('my_tube.I1')
+    
+    # import matplotlib.pyplot as plt
+
+    # plt.plot(t,x[:,0], '-b', label='q_C')
+    # plt.xlabel("time (s)")
+    # plt.ylabel("fluid volume (m^3)")
+    # plt.legend(loc='upper right')
+    # plt.grid()
+    # plt.show()
 
 def Tube():
     import BondGraphTools as bgt
@@ -232,4 +268,4 @@ def Tube():
     plt.grid()
     plt.show()
 
-testRCcomplex()
+test_Tube()
