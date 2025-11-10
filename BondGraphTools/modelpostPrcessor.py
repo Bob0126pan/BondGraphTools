@@ -70,30 +70,6 @@ class ComponentData:
             if 'effort' in port_vars and 'flow' in port_vars:
                 self.power[port_id] = port_vars['effort'] * port_vars['flow']
     
-    def to_dict(self, include_subcomponents: bool = True) -> Dict:
-        """转换为字典格式"""
-        data = {
-            'name': self.name,
-            'type': self.type,
-            'parameters': self.parameters,
-            'states': {k: v.tolist() if isinstance(v, np.ndarray) else v 
-                      for k, v in self.states.items()},
-            'state_derivatives': {k: v.tolist() if isinstance(v, np.ndarray) else v 
-                                 for k, v in self.state_derivatives.items()},
-            'ports': {port_id: {k: v.tolist() if isinstance(v, np.ndarray) else v 
-                               for k, v in port_vars.items()}
-                     for port_id, port_vars in self.ports.items()},
-            'energy': self.energy.tolist() if isinstance(self.energy, np.ndarray) else self.energy,
-            'power': {k: v.tolist() if isinstance(v, np.ndarray) else v 
-                     for k, v in self.power.items()},
-        }
-        
-        if include_subcomponents and self.subcomponents:
-            data['subcomponents'] = {name: comp.to_dict(True) 
-                                    for name, comp in self.subcomponents.items()}
-        
-        return data
-    
     def get_dataframe(self, time: np.ndarray = None) -> pd.DataFrame:
         """获取该组件的DataFrame"""
         data = {}
@@ -125,12 +101,12 @@ class ComponentData:
 
 class BondGraphPost:
     """
-    Bond Graph模型的层次化后处理类 - 递归扁平化版本
+    Bond Graph模型的层次化后处理类 - 整合版本
     
     核心思路：
-    1. 递归调用所有子模型的 system_model()
-    2. 将所有状态变量、端口映射展开到扁平化结构
-    3. 构建完整的代数方程求解所有变量
+    1. 递归处理所有层次的组件
+    2. 对每个层次单独调用 system_model()
+    3. 使用正确的方法从 AX+F 中提取端口变量
     """
     
     def __init__(self, model, simulation_results: Union[Tuple, np.ndarray] = None):
@@ -161,15 +137,12 @@ class BondGraphPost:
         # 组件数据字典
         self.components = {}
         
-        # 扁平化的映射关系
-        self.flat_state_map = {}  # {(comp_obj, state_name): (full_path, idx)}
-        self.flat_port_map = {}   # {(comp_obj, port_obj): (full_path, bond_idx)}
-        
-        # 递归扁平化所有子模型
-        self._flatten_model()
+        # 提取所有组件（包括子模型内的）
+        self._extract_all_components()
         
         # 处理组件数据
-        self._process_components()
+        if self.x is not None:
+            self._process_components()
         
     def _get_component_info(self, comp) -> Tuple[str, str]:
         """获取组件名称和类型"""
@@ -178,89 +151,40 @@ class BondGraphPost:
                    (comp.component_type if hasattr(comp, 'component_type') else 'unknown')
         return name, comp_type
     
-    def _flatten_model(self, model=None, parent_path: str = ""):
-        """
-        递归扁平化模型结构
-        
-        对每个子模型调用 system_model()，提取其内部的状态和端口映射
-        """
-        if model is None:
-            model = self.model
-        
-        print(f"\n扁平化模型: {parent_path if parent_path else 'root'}")
-        
-        try:
-            # 获取模型的 system_model
-            X, mapping, A, F, G = model.system_model()
-            
-            print(f"  状态变量数: {len(X)}")
-            print(f"  映射关系: {len(mapping) if mapping else 0}")
-            
-            # 处理状态变量映射 mapping[0]
-            if mapping and len(mapping) > 0:
-                state_mapping = mapping[0]
-                print(f"  状态映射项数: {len(state_mapping)}")
-                
-                for (comp, state_name), idx in state_mapping.items():
-                    comp_name, comp_type = self._get_component_info(comp)
-                    full_path = f"{parent_path}.{comp_name}" if parent_path else comp_name
-                    
-                    # 保存到扁平化映射
-                    self.flat_state_map[(comp, state_name)] = (full_path, idx)
-                    print(f"    状态: {full_path}.{state_name} -> idx {idx}")
-            
-            # 处理端口映射 mapping[1]
-            if mapping and len(mapping) > 1:
-                port_mapping = mapping[1]
-                print(f"  端口映射项数: {len(port_mapping)}")
-                
-                for port, bond_idx in port_mapping.items():
-                    comp = port.component
-                    comp_name, comp_type = self._get_component_info(comp)
-                    full_path = f"{parent_path}.{comp_name}" if parent_path else comp_name
-                    
-                    # 保存到扁平化映射
-                    self.flat_port_map[(comp, port)] = (full_path, bond_idx)
-                    print(f"    端口: {full_path}.port{port.index if hasattr(port, 'index') else 0} -> bond {bond_idx}")
-            
-        except Exception as e:
-            print(f"  警告: 无法获取 system_model: {e}")
-        
-        # 递归处理子模型
-        if hasattr(model, 'components'):
-            for comp in model.components:
-                comp_name, comp_type = self._get_component_info(comp)
-                
-                # 如果组件本身是一个模型（有 components 和 system_model）
-                if hasattr(comp, 'components') and hasattr(comp, 'system_model'):
-                    full_path = f"{parent_path}.{comp_name}" if parent_path else comp_name
-                    print(f"  发现子模型: {comp_name}")
-                    self._flatten_model(comp, full_path)
-    
-    def _extract_all_components(self, model=None, parent_path: str = "") -> Dict[str, Any]:
+    def _extract_all_components(self, model=None, parent_path: str = ""):
         """递归提取所有组件"""
         if model is None:
             model = self.model
         
-        components = {}
+        print(f"\n提取组件: {parent_path if parent_path else 'root'}")
         
         if hasattr(model, 'components'):
             for comp in model.components:
                 comp_name, comp_type = self._get_component_info(comp)
                 full_path = f"{parent_path}.{comp_name}" if parent_path else comp_name
-                components[full_path] = comp
                 
-                # 递归子模型
-                if hasattr(comp, 'components'):
-                    sub_components = self._extract_all_components(comp, full_path)
-                    components.update(sub_components)
-        
-        return components
+                print(f"  发现组件: {full_path} ({comp_type})")
+                
+                # 创建 ComponentData
+                comp_data = ComponentData(full_path, comp_type, comp)
+                
+                # 添加参数
+                if hasattr(comp, 'value'):
+                    try:
+                        comp_data.add_parameter('value', float(comp.value))
+                        print(f"    参数: value = {comp.value}")
+                    except:
+                        pass
+                
+                self.components[full_path] = comp_data
+                
+                # 递归处理子模型
+                if hasattr(comp, 'components') and hasattr(comp, 'system_model'):
+                    print(f"  {full_path} 是子模型，递归处理...")
+                    self._extract_all_components(comp, full_path)
     
     def _process_components(self):
-        """
-        使用扁平化的映射关系处理组件数据
-        """
+        """处理组件数据：状态变量和端口变量"""
         if self.x is None:
             return
         
@@ -280,168 +204,218 @@ class BondGraphPost:
         print(f"  仿真时间步数: {len(x_2d)}")
         print(f"  状态变量数: {x_2d.shape[1]}")
         
-        # 提取所有组件
-        all_components = self._extract_all_components()
+        # 处理主模型
+        self._process_model_level(self.model, x_2d, dx_dt, "")
         
-        # 创建 ComponentData
-        for comp_path, comp in all_components.items():
-            comp_name, comp_type = self._get_component_info(comp)
-            comp_data = ComponentData(comp_path, comp_type, comp)
+        # 组织层次结构
+        self._organize_hierarchy()
+    
+    def _process_model_level(self, model, x_2d: np.ndarray, dx_dt: np.ndarray, parent_path: str):
+        """
+        处理特定层次的模型
+        
+        关键：对每个模型单独调用 system_model()，使用其返回的映射关系
+        """
+        print(f"\n处理模型层次: {parent_path if parent_path else 'root'}")
+        
+        try:
+            X, mapping, A, F, G = model.system_model()
             
-            # 添加参数
-            if hasattr(comp, 'value'):
-                try:
-                    comp_data.add_parameter('value', float(comp.value))
-                except:
-                    pass
+            if not mapping or len(mapping) < 1:
+                print(f"  警告: 没有映射关系")
+                return
             
-            self.components[comp_path] = comp_data
-        
-        print(f"  提取了 {len(self.components)} 个组件")
-        
-        # 使用扁平化映射填充状态变量
-        print(f"\n填充状态变量:")
-        for (comp, state_name), (full_path, idx) in self.flat_state_map.items():
-            if full_path in self.components:
-                comp_data = self.components[full_path]
+            state_mapping = mapping[0]
+            port_mapping = mapping[1] if len(mapping) > 1 else {}
+            
+            print(f"  状态变量数: {len(X)}")
+            print(f"  状态映射数: {len(state_mapping)}")
+            print(f"  端口映射数: {len(port_mapping)}")
+            
+            # 处理状态变量
+            print(f"  处理状态映射:")
+            for (comp, state_name), idx in state_mapping.items():
+                comp_name, comp_type = self._get_component_info(comp)
+                full_path = f"{parent_path}.{comp_name}" if parent_path else comp_name
                 
-                if idx < x_2d.shape[1]:
+                # 尝试匹配组件
+                matched_path = None
+                if full_path in self.components:
+                    matched_path = full_path
+                else:
+                    # 通过组件对象匹配
+                    for path, comp_data in self.components.items():
+                        if comp_data.component is comp:
+                            matched_path = path
+                            break
+                
+                if matched_path and idx < x_2d.shape[1]:
+                    comp_data = self.components[matched_path]
                     state_values = x_2d[:, idx]
                     deriv_values = dx_dt[:, idx]
                     
                     comp_data.add_state(state_name, state_values, deriv_values)
                     comp_data.calculate_energy()
                     
-                    print(f"  {full_path}.{state_name} <- x[{idx}]")
+                    print(f"    ✓ {matched_path}.{state_name} <- x[{idx}]")
+            
+            # 求解端口变量 - 使用正确的方法
+            self._solve_port_variables_from_equations(model, x_2d, dx_dt, parent_path, X, mapping, A, F)
+            
+            # 递归处理子模型
+            if hasattr(model, 'components'):
+                for comp in model.components:
+                    comp_name, comp_type = self._get_component_info(comp)
+                    full_path = f"{parent_path}.{comp_name}" if parent_path else comp_name
+                    
+                    # 如果是子模型
+                    if hasattr(comp, 'components') and hasattr(comp, 'system_model'):
+                        print(f"  发现子模型: {full_path}")
+                        self._process_model_level(comp, x_2d, dx_dt, full_path)
         
-        # 计算端口变量
-        self._compute_port_variables_flat(x_2d)
-        
-        # 组织层次结构
-        self._organize_hierarchy()
+        except Exception as e:
+            print(f"  错误: {e}")
+            import traceback
+            traceback.print_exc()
     
-    def _compute_port_variables_flat(self, x_2d: np.ndarray):
+    def _solve_port_variables_from_equations(self, model, x_2d: np.ndarray, dx_dt: np.ndarray,
+                                            model_path: str, X, mapping, A, F):
         """
-        使用扁平化映射计算端口变量
+        从完整方程 AX + F 中提取端口变量
         
-        基本思路：
-        对每个子模型，求解其代数方程 G * [e, f] = A * x + F
+        核心思路（基于第一个正确版本）：
+        1. X 包含所有变量: [dx_0, e_0, f_0, e_1, f_1, ..., x_0]
+        2. 通过 AX + F 计算出所有变量的值
+        3. 根据符号名称匹配提取 effort 和 flow
         """
-        print(f"\n计算端口变量:")
+        if not mapping or len(mapping) < 2:
+            print(f"    没有端口映射")
+            return
         
-        # 为每个有端口的组件初始化端口数组
-        for (comp, port), (full_path, bond_idx) in self.flat_port_map.items():
+        state_mapping = mapping[0]
+        port_mapping = mapping[1]
+        
+        if not port_mapping:
+            print(f"    没有端口需要处理")
+            return
+        
+        print(f"    从方程提取端口变量:")
+        print(f"    X 向量长度: {len(X)}")
+        
+        # 初始化端口数组
+        for port, bond_idx in port_mapping.items():
+            comp = port.component
+            comp_name = self._get_component_info(comp)[0]
+            full_path = f"{model_path}.{comp_name}" if model_path else comp_name
+            
+            # 匹配组件
+            matched_path = None
             if full_path in self.components:
-                comp_data = self.components[full_path]
+                matched_path = full_path
+            else:
+                for path, comp_data in self.components.items():
+                    if comp_data.component is comp:
+                        matched_path = path
+                        break
+            
+            if matched_path:
+                comp_data = self.components[matched_path]
                 port_id = str(port.index) if hasattr(port, 'index') else '0'
                 
                 if port_id not in comp_data.ports:
                     comp_data.ports[port_id]['effort'] = np.zeros(len(x_2d))
                     comp_data.ports[port_id]['flow'] = np.zeros(len(x_2d))
         
-        # 对主模型求解
-        self._solve_algebraic_equations(self.model, x_2d, "")
-        
-        # 对每个子模型递归求解
-        self._solve_submodels_algebraic(self.model, x_2d, "")
-        
-        # 计算功率
-        for comp_data in self.components.values():
-            comp_data.calculate_power()
-    
-    def _solve_submodels_algebraic(self, model, x_2d: np.ndarray, parent_path: str):
-        """递归求解子模型的代数方程"""
-        if not hasattr(model, 'components'):
-            return
-        
-        for comp in model.components:
-            comp_name, comp_type = self._get_component_info(comp)
-            full_path = f"{parent_path}.{comp_name}" if parent_path else comp_name
+        # 对每个时间步计算
+        for i in range(len(x_2d)):
+            # 准备输入：状态变量 + 状态导数
+            # 需要按照 X 中符号的顺序准备输入
+            input_values = []
             
-            # 如果是子模型
-            if hasattr(comp, 'system_model') and hasattr(comp, 'components'):
-                print(f"  求解子模型: {full_path}")
-                self._solve_algebraic_equations(comp, x_2d, full_path)
+            for sym in X:
+                sym_str = str(sym)
                 
-                # 递归
-                self._solve_submodels_algebraic(comp, x_2d, full_path)
-    
-    def _solve_algebraic_equations(self, model, x_2d: np.ndarray, model_path: str):
-        """
-        求解特定模型的代数方程
-        
-        G * [e, f] = A * x + F
-        """
-        try:
-            X, mapping, A, F, G = model.system_model()
-            
-            if not mapping or len(mapping) < 2:
-                return
-            
-            port_mapping = mapping[1]
-            
-            if G.rows == 0 or G.cols == 0:
-                print(f"    跳过 {model_path}: G 矩阵为空")
-                return
-            
-            print(f"    G 矩阵: {G.rows}x{G.cols}, 状态数: {len(X)}")
-            
-            # 对每个时间步求解
-            for i in range(len(x_2d)):
-                x_val = x_2d[i, :len(X)]
-                
-                try:
-                    # 计算 A * x + F
-                    AX_F = A * Matrix(x_val) + F
-                    
-                    # 求解 G * y = AX_F
-                    if G.is_square:
-                        try:
-                            y_solution = G.inv() * AX_F
-                        except:
-                            # 奇异矩阵，使用伪逆
-                            y_solution = G.pinv() * AX_F
+                if sym_str.startswith('dx_'):
+                    # 状态导数
+                    idx = int(sym_str.split('_')[1])
+                    if idx < dx_dt.shape[1]:
+                        input_values.append(dx_dt[i, idx])
                     else:
-                        # 非方阵，使用最小二乘
-                        y_solution = G.pinv() * AX_F
+                        input_values.append(0.0)
+                
+                elif sym_str.startswith('x_'):
+                    # 状态变量
+                    idx = int(sym_str.split('_')[1])
+                    if idx < x_2d.shape[1]:
+                        input_values.append(x_2d[i, idx])
+                    else:
+                        input_values.append(0.0)
+                
+                else:
+                    # 其他变量（e, f 等）暂时设为 0，后面会计算
+                    input_values.append(0.0)
+            
+            try:
+                # 计算 AX + F，得到所有变量的值
+                X_computed = A * Matrix(input_values) + F
+                
+                # 从计算结果中提取端口变量
+                for port, bond_idx in port_mapping.items():
+                    comp = port.component
                     
-                    # 分配到各个端口
-                    for port, bond_idx in port_mapping.items():
-                        comp = port.component
-                        comp_name = self._get_component_info(comp)[0]
+                    # 匹配组件
+                    matched_path = None
+                    comp_name = self._get_component_info(comp)[0]
+                    full_path = f"{model_path}.{comp_name}" if model_path else comp_name
+                    
+                    if full_path in self.components:
+                        matched_path = full_path
+                    else:
+                        for path, comp_data in self.components.items():
+                            if comp_data.component is comp:
+                                matched_path = path
+                                break
+                    
+                    if matched_path:
+                        comp_data = self.components[matched_path]
+                        port_id = str(port.index) if hasattr(port, 'index') else '0'
                         
-                        # 构建完整路径
-                        if model_path:
-                            full_path = f"{model_path}.{comp_name}"
-                        else:
-                            full_path = comp_name
+                        # 在 X 向量中查找对应的 e 和 f 符号
+                        e_symbol = f"e_{bond_idx}"
+                        f_symbol = f"f_{bond_idx}"
                         
-                        if full_path in self.components:
-                            comp_data = self.components[full_path]
-                            port_id = str(port.index) if hasattr(port, 'index') else '0'
+                        for idx, var in enumerate(X):
+                            var_str = str(var)
                             
-                            # effort 和 flow 在 y_solution 中
-                            # 通常格式: [e_0, f_0, e_1, f_1, ...]
-                            if 2 * bond_idx + 1 < len(y_solution):
+                            if var_str == e_symbol and idx < len(X_computed):
                                 try:
-                                    e_val = float(y_solution[2 * bond_idx])
-                                    f_val = float(y_solution[2 * bond_idx + 1])
-                                    
+                                    e_val = float(X_computed[idx])
                                     comp_data.ports[port_id]['effort'][i] = e_val
+                                    
+                                    if i == 0:
+                                        print(f"      {matched_path}.port{port_id}.effort <- {e_symbol} = {e_val:.4f}")
+                                except:
+                                    pass
+                            
+                            elif var_str == f_symbol and idx < len(X_computed):
+                                try:
+                                    f_val = float(X_computed[idx])
                                     comp_data.ports[port_id]['flow'][i] = f_val
                                     
                                     if i == 0:
-                                        print(f"      {full_path}.port{port_id}: e={e_val:.4f}, f={f_val:.4f}")
-                                except Exception as e:
+                                        print(f"      {matched_path}.port{port_id}.flow <- {f_symbol} = {f_val:.4f}")
+                                except:
                                     pass
-                
-                except Exception as e:
-                    if i == 0:
-                        print(f"    警告: 时间步 {i} 求解失败: {e}")
-                    continue
+            
+            except Exception as e:
+                if i == 0:
+                    print(f"    警告: 时间步 {i} 计算失败: {e}")
+                continue
         
-        except Exception as e:
-            print(f"    警告: 无法求解 {model_path}: {e}")
+        # 计算功率
+        for comp_data in self.components.values():
+            if model_path in comp_data.name or (not model_path and '.' not in comp_data.name):
+                comp_data.calculate_power()
     
     def _organize_hierarchy(self):
         """组织组件的层次结构"""
@@ -458,12 +432,12 @@ class BondGraphPost:
         if component_name in self.components:
             return self.components[component_name]
         
-        # 模糊匹配
+        # 模糊匹配（末尾匹配）
         for path, comp_data in self.components.items():
             if path.endswith(component_name):
                 return comp_data
         
-        # 更模糊的匹配
+        # 更模糊的匹配（包含）
         for path, comp_data in self.components.items():
             if component_name in path:
                 return comp_data
@@ -489,17 +463,25 @@ class BondGraphPost:
             prefix = "  " * level
             print(f"{prefix}├─ {comp.name} ({comp.type})")
             
+            if comp.parameters:
+                params_str = ", ".join([f"{k}={v}" for k, v in comp.parameters.items()])
+                print(f"{prefix}│  参数: {params_str}")
+            
             if comp.states:
-                print(f"{prefix}│  States: {list(comp.states.keys())}")
+                print(f"{prefix}│  状态: {list(comp.states.keys())}")
+            
             if comp.ports:
                 port_info = []
                 for pid, pdata in comp.ports.items():
                     has_e = 'effort' in pdata and np.any(pdata['effort'] != 0)
                     has_f = 'flow' in pdata and np.any(pdata['flow'] != 0)
-                    port_info.append(f"p{pid}({'e' if has_e else ''}{'f' if has_f else ''})")
-                print(f"{prefix}│  Ports: {port_info}")
+                    if has_e or has_f:
+                        port_info.append(f"p{pid}({'e' if has_e else ''}{'f' if has_f else ''})")
+                if port_info:
+                    print(f"{prefix}│  端口: {port_info}")
+            
             if comp.subcomponents:
-                print(f"{prefix}│  Subcomponents:")
+                print(f"{prefix}│  子组件:")
                 for sub in comp.subcomponents.values():
                     print_component(sub, level + 1)
         
@@ -533,23 +515,6 @@ class BondGraphPost:
         if all_dfs:
             return pd.concat(all_dfs, axis=1)
         return pd.DataFrame()
-    
-    def to_dict(self, include_hierarchy: bool = True) -> Dict:
-        """转换为字典格式（JSON友好）"""
-        result = {
-            'model_name': self.model.name if hasattr(self.model, 'name') else 'unknown',
-            'time': self.t.tolist() if self.t is not None else None,
-            'components': {}
-        }
-        
-        for name, comp_data in self.components.items():
-            if include_hierarchy:
-                if '.' not in name:
-                    result['components'][name] = comp_data.to_dict(True)
-            else:
-                result['components'][name] = comp_data.to_dict(False)
-        
-        return result
     
     def plot_component(self, component_name: str, figsize=(12, 6)):
         """绘制特定组件的所有变量"""
@@ -591,32 +556,6 @@ class BondGraphPost:
         plt.tight_layout()
         plt.show()
     
-    def plot_comparison(self, component_names: List[str], variable: str = 'energy', 
-                       figsize=(10, 6)):
-        """比较多个组件的同一变量"""
-        if self.t is None:
-            print("No time data available")
-            return
-        
-        plt.figure(figsize=figsize)
-        
-        for comp_name in component_names:
-            comp = self.get_component(comp_name)
-            if comp:
-                df = comp.get_dataframe(self.t)
-                matching_cols = [col for col in df.columns if variable in col.lower()]
-                
-                for col in matching_cols:
-                    plt.plot(self.t, df[col].values, label=f'{comp_name}', linewidth=2)
-        
-        plt.xlabel('Time')
-        plt.ylabel(variable.capitalize())
-        plt.title(f'{variable.capitalize()} Comparison')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        plt.tight_layout()
-        plt.show()
-    
     def summary(self):
         """打印结果摘要"""
         print("\n" + "="*70)
@@ -650,12 +589,13 @@ class BondGraphPost:
 
 # 使用示例
 if __name__ == "__main__":
-    print("BondGraphPost - 递归扁平化版本")
-    print("\n核心改进:")
-    print("1. _flatten_model() - 递归调用所有子模型的 system_model()")
-    print("2. _solve_submodels_algebraic() - 递归求解每个子模型的代数方程")
-    print("3. 完整的端口变量计算，支持嵌套子模型")
+    print("BondGraphPost - 整合层次化与正确求解版本")
+    print("\n核心特点:")
+    print("1. 层次化处理：递归处理 mainmodel 和所有 submodel")
+    print("2. 正确求解：使用 AX+F 方程从符号匹配提取端口变量")
+    print("3. 完整映射：通过组件对象匹配，确保路径正确")
     print("\n使用:")
     print("post = BondGraphPost(mainmodel, (t, x))")
     print("post.list_components()")
-    print("post.plot_component('subR.R1')  # 现在应该有端口数据了")
+    print("post.plot_component('subR.C2')")
+    print("post.plot_component('subR.R1')")
