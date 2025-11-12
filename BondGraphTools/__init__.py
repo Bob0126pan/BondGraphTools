@@ -62,7 +62,7 @@ Released under the Apache 2.0 License::
 """
 
 from .actions import (
-    add, connect, disconnect, expose, new, remove, swap, set_param
+    add, connect, disconnect, expose, new, remove, swap, set_param,_find_or_make_port
 )
 from .fileio import save, load
 from .compound import BondGraph

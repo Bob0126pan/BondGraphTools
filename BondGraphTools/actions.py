@@ -27,7 +27,8 @@ __all__ = [
     "disconnect",
     "expose",
     "remove",
-    "set_param"
+    "set_param",
+    
 ]
 
 
@@ -261,7 +262,7 @@ def new(component=None, name=None, library=base_id, value=None, **kwargs):
         )
 
 
-def new_extended(comp_type: str, value=None, name=None):
+def new_extended(comp_type: str, value=None, para_symbols=False,name=None):
     """
     一个增强版 new()：
     - 支持基本组件（直接调用 BondGraphTools.new）
@@ -287,7 +288,7 @@ def new_extended(comp_type: str, value=None, name=None):
         
         # 构建复合组件
         from .submodelManage import CompositeBuilder
-        builder = CompositeBuilder(comp_spec)
+        builder = CompositeBuilder(comp_spec, default_value=value)
         return builder.get_model()
     except Exception as e:
         raise ValueError(f"未知组件类型: {comp_type}") from e
@@ -355,7 +356,7 @@ def _find_subclass(name, base_class):
                 return sc
 
 
-def expose(component, label=None):
+def expose(component, label=None,direction="out"):
     """
     Exposes the component as port on the parent.
 
@@ -380,7 +381,7 @@ def expose(component, label=None):
         ss = new("SS", name=component.name)
         try:
             model.add(ss)
-            connect(component, ss)
+            connect(component, ss) if direction=="out" else connect(ss,component)
             
         except InvalidComponentException as ex:
             raise InvalidComponentException(f"Cannot expose {component}", ex)

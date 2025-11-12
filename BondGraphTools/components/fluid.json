@@ -1,0 +1,74 @@
+{
+  "description": "Fluid Components Library",
+  "id":"fluid",
+  "components": {
+    "Tube": {
+      "description": "A Tube Model containing R, C, and I elements",
+      "metamodel": "Tube",
+      "class": "Component",
+      "type": "fluid",
+      "ports": {
+        "0": {
+          "description": "inlet"
+        },
+        "1": {
+          "description": "outlet"
+        }
+      },
+      "params": {
+        "r1": {
+          "description": "Resistance",
+          "value": 10.664e-6,
+          "range": [
+            0,
+            "inf"
+          ]
+        },
+        "r2": {
+          "description": "Resistance",
+          "value": 10.664e-6,
+          "range": [
+            0,
+            "inf"
+          ]
+        },
+        "L1": {
+          "description": "Resistance",
+          "value": 0.6665e6,
+          "range": [
+            0,
+            "inf"
+          ]
+        },
+        "L2": {
+          "description": "Resistance",
+          "value": 0.6665e6,
+          "range": [
+            0,
+            "inf"
+          ]
+        },
+        "C": {
+          "description": "Resistance",
+          "value": 0.60015e-6,
+          "range": [
+            0,
+            "inf"
+          ]
+        }
+      },
+      "state_vars":{
+        "q_0":"volumn effect",
+        "p_0":"inlet mass inertial effect",
+        "p_1":"outlet mass inertial effect"
+      },
+      "constitutive_relations": [
+        "dq_0 + p_1/L2 - p_0/L1",
+        "dp_0 + e_0 + r1*p_0/L1 + q_0/C",
+        "dp_1 + e_1 + r2*p_1/L2 - q_0/C",
+        "f_0 + p_0/L1",
+        "f_1 + p_1/L2"
+      ]
+    }
+}
+}

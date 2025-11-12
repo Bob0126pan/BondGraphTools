@@ -556,6 +556,57 @@ class BondGraphPost:
         plt.tight_layout()
         plt.show()
     
+    def plot_comparison(self, component_names: List[str], variable: str = 'energy', unit: str = '',
+                       figsize=(10, 6)):
+        """比较多个组件的同一变量"""
+        if self.t is None:
+            print("No time data available")
+            return
+        
+        plt.figure(figsize=figsize)
+        
+        for comp_name in component_names:
+            comp = self.get_component(comp_name)
+            if comp:
+                df = comp.get_dataframe(self.t)
+                matching_cols = [col for col in df.columns if variable in col.lower()]
+                
+                for col in matching_cols:
+                    plt.plot(self.t, df[col].values, label=f'{comp_name}', linewidth=2)
+        
+        plt.xlabel('Time')
+        plt.ylabel(variable.capitalize()+(f' ({unit})' if unit else ''))
+        plt.title(f'{variable.capitalize()} Comparison')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.show()
+
+    def to_dict(self, include_hierarchy: bool = True) -> Dict:
+        """
+        转换为字典格式（JSON友好）
+        
+        Parameters:
+        -----------
+        include_hierarchy : bool
+            是否包含层次结构
+        """
+        result = {
+            'model_name': self.model.name if hasattr(self.model, 'name') else 'unknown',
+            'time': self.t.tolist() if self.t is not None else None,
+            'components': {}
+        }
+        
+        for name, comp_data in self.components.items():
+            if include_hierarchy:
+                # 只包含根组件（子组件会递归包含）
+                if '.' not in name:
+                    result['components'][name] = comp_data.to_dict(True)
+            else:
+                result['components'][name] = comp_data.to_dict(False)
+        
+        return result
+
     def summary(self):
         """打印结果摘要"""
         print("\n" + "="*70)

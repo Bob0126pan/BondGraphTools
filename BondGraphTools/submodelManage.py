@@ -9,11 +9,12 @@ from BondGraphTools.exceptions import InvalidComponentException
 
 ### 支持嵌套的子模块读取
 class CompositeBuilder:
-    def __init__(self, comp_def: dict):
+    def __init__(self, comp_def: dict,default_value=None):
         self.comp_def = comp_def
         self.name = comp_def.get("name")
         self.submodel = new(name=self.name)
         self.components = {}  # 名称到组件的映射
+        self.default_value=default_value
         self._build()
 
     def _create_component(self, name: str, comp_spec: dict):
@@ -22,8 +23,11 @@ class CompositeBuilder:
         lib, comp = comp_type.rsplit('.', 1)
         
         # 1. 基本组件
-        if lib in ['base','BioChem','elec']:
-            value = comp_spec.get("value", None)
+        if lib in ['base','BioChem','elec','base1']:
+            if self.default_value:
+                value = comp_spec.get("value", None)
+            else:
+                value = None
             return new(comp, value=value, name=name,library=lib)
         
         # 2. 复合组件（递归构建）
@@ -59,9 +63,11 @@ class CompositeBuilder:
                 raise ValueError(f"无效连接格式: {conn}")
 
         # Step 3: 暴露端口（只需处理当前层组件）
-        for comp_name, port_label in exposed.items():
+        for comp_name, port_info in exposed.items():
             component = self.components[comp_name]
-            expose(component, label=port_label)
+            port_label = port_info["port"]        # 从字典中获取 "port" 的值
+            direction = port_info["direction"] 
+            expose(component, label=port_label,direction=direction)
 
     def get_model(self):
         return self.submodel 

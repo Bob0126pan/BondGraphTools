@@ -7,11 +7,11 @@
       "name": "Tube",
       "class": "Composite",
       "subcomponents": {
-        "C": {"type": "base.C", "value": {"C": 0.60015e-6}},
-        "R1": { "type": "base.R", "value": {"r": 10.664e-6}},
-        "R2": { "type": "base.R", "value": {"r": 10.664e-6}},
-        "I1": { "type": "base.I", "value": {"L": 0.06665e6}},
-        "I2": { "type": "base.I", "value": {"L": 0.06665e6}},
+        "C": {"type": "base1.C", "value": {"C": 0.60015e-6}},
+        "R1": { "type": "base1.R", "value": {"r": 10.664e-6}},
+        "R2": { "type": "base1.R", "value": {"r": 10.664e-6}},
+        "I1": { "type": "base1.I", "value": {"L": 0.06665e6}},
+        "I2": { "type": "base1.I", "value": {"L": 0.06665e6}},
         "zero": {"type": "base.0"},
         "one1": {"type": "base.1"},
         "one2": {"type": "base.1"}
@@ -26,8 +26,76 @@
         ["one2", "I2"]
       ],
       "expose_ports": {
-        "one1": "one1",
-        "one2": "one2"
+        "one1": {
+          "port": "one1",
+          "direction": "in"
+        },
+        "one2": {
+          "port": "one2",
+          "direction": "out"
+        }
+      }
+    },
+    "branch": {
+      "description": "Fluid Branch Component",
+      "name": "branch",
+      "class": "Composite",
+      "subcomponents": {
+
+        "C1":{"type": "base.C", "value": {"C": 0.60015e-6}},
+        "C2":{"type": "base.C", "value": {"C": 0.125281e-6}},
+        "C3":{"type": "base.C", "value": {"C": 0.1125281e-6}},
+        
+        "I1":{"type": "base.I", "value": {"L": 0.123e6}},
+        "I2":{"type": "base.I", "value": {"L": 0.08665e6}},
+        "I3":{"type": "base.I", "value": {"L": 0.06665e6}},
+
+        "R1":{"type": "base.R", "value": {"r": 1.333e6}},
+        "R2":{"type": "base.R", "value": {"r": 10.564e6}},
+        "R3":{"type": "base.R", "value": {"r": 10.664e6}},
+
+        "zero1": {"type": "base.0"},
+        "zero2": {"type": "base.0"},
+        "zero3": {"type": "base.0"},
+
+        "one1": {"type": "base.1"},
+        "one2": {"type": "base.1"},
+        "one3": {"type": "base.1"}
+
+        
+      },
+      "connections": [
+        ["one1", "zero1"],
+        ["one1", "R1"],
+        ["one1", "I1"],
+        ["zero1", "C1"],
+
+        ["one2", "zero2"],
+        ["one2", "R2"],
+        ["one2", "I2"],
+        ["zero2", "C2"],
+
+        ["one3", "zero3"],
+        ["one3", "R3"],
+        ["one3", "I3"],
+        ["zero3", "C3"],
+
+        ["zero1", "one2"],
+        ["zero1", "one3"]
+      ],
+      "expose_ports": {
+        "one1": {
+          "port": "P1",
+          "direction": "in"
+        },
+        "zero2": {
+          "port": "P2",
+          "direction": "out"
+        },
+        "zero3": {
+          "port": "P3",
+          "direction": "out"
+        }
       }
     }
     }

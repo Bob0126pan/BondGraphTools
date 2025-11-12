@@ -614,6 +614,7 @@ def inverse_coord_maps(tangent_space, port_space, control_space):
 def get_relations_iterator(component, mappings, coordinates, io_map=None):
     local_tm, local_js, local_cv = component.basis_vectors
     inv_tm, inv_js, inv_cv = mappings
+    if component.parent.para_symbols: local_cv=dict()
 
     num_ports = len(inv_js)
     num_state_vars = len(inv_tm)

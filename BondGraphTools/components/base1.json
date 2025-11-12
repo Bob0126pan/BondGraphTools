@@ -1,0 +1,172 @@
+{
+  "description": "Basic Components",
+  "id":"base1",
+  "components": {
+    "0": {
+      "description": "Equal Effort Node",
+      "metamodel": "0",
+      "class": "EqualEffort",
+      "type": "base"
+    },
+    "1": {
+      "description": "Equal Flow Node",
+      "class": "EqualFlow",
+      "metamodel":"1"
+    },
+    "R": {
+      "description": "Generalised Linear Resistor",
+      "class": "Component",
+      "metamodel":"R",
+      "type": "base",
+      "ports": {
+        "0": null
+      },
+      "params": {
+        "r": {
+          "description": "Resistance",
+          "value": "R",
+          "para_symbol": true
+        }
+      },
+      "constitutive_relations": [
+        "e_0 - f_0*r"
+      ]
+    },
+    "C": {
+      "description": "Generalised Linear Capacitor",
+      "class": "Component",
+      "metamodel":"C",
+      "type": "base",
+      "ports": {
+        "0": null
+      },
+      "params": {
+        "C": {
+          "description": "Capacitance",
+          "value": "C",
+          "para_symbol": true
+        }
+      },
+      "state_vars":{
+        "q_0":"Generalised Position"
+      },
+      "constitutive_relations": [
+        "q_0 - C * e_0",
+        "dq_0 - f_0"
+      ]
+    },
+    "I": {
+      "description": "Generalised Linear Inductor",
+      "class": "Component",
+      "metamodel": "I",
+      "ports": {
+        "0": null
+      },
+      "state_vars":{
+        "p_0":"Generalised Momentum"
+      },
+      "params": {
+        "L": {
+          "description": "Inductance",
+          "value": "I",
+          "para_symbol": true
+        }
+      },
+      "constitutive_relations": [
+        "p_0 - L*f_0",
+        "dp_0 - e_0"
+      ]
+    },
+    "Se": {
+      "description": "Effort Source",
+      "class": "Component",
+      "metamodel":"SS",
+      "ports": {
+        "0": null
+      },
+      "params": {
+        "e": null
+      },
+      "constitutive_relations": [
+        "e_0 - e"
+      ]
+    },
+    "Sf": {
+      "description": "Flow Source",
+      "class": "Component",
+      "metamodel":"SS",
+      "ports": {
+        "0": null
+      },
+      "params": {
+        "f": null
+      },
+      "constitutive_relations": [
+        "f_0 + f"
+      ]
+    },
+    "TF": {
+      "description": "Linear Transformer",
+      "class": "Component",
+      "metamodel":"TF",
+      "ports": {
+        "0": {
+          "description": "Primary"
+        },
+        "1": {
+          "description": "Secondary"
+        }
+      },
+      "params": {
+        "r": {
+          "description": "Ratio"
+        }
+      },
+      "constitutive_relations": [
+        "e_1 - r * e_0",
+        "f_0 + r * f_1"
+      ]
+    },
+    "GY": {
+      "description": "Linear Gyrator",
+      "class": "Component",
+      "metamodel":"GY",
+      "ports": {
+        "0": {
+          "description": "Primary"
+        },
+        "1": {
+          "description": "Secondary"
+        }
+      },
+      "params": {
+        "R": {
+          "description": "Ratio"
+        }
+      },
+      "constitutive_relations": [
+        "e_1 + R*f_0",
+        "e_0 - R*f_1"
+      ]
+    },
+    "SS":{
+      "description": "Source Sensor",
+      "class": "Component",
+      "metamodel":"SS",
+      "ports": {
+        "0": null
+      },
+      "params":{
+          "f":null,
+          "e":null
+      },
+      "constitutive_relations": ["e_0 - e", "f_0+f"]
+    },
+  "PH":{
+    "class": "PortHamiltonian",
+    "metamodel":"PH",
+    "description":"Port Hamiltonian",
+    "params":{}
+    }
+  }
+}

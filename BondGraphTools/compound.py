@@ -39,6 +39,7 @@ class BondGraph(BondGraphBase, LabeledPortManager):
 
         self._port_map = dict()
         self._model_changed = True
+        self.para_symbols=False
 
     @property
     def template(self):
@@ -430,7 +431,7 @@ class BondGraph(BondGraphBase, LabeledPortManager):
         }
         port_space.update(external_ports)
 
-        return tangent_space, port_space, control_space
+        return tangent_space, port_space, control_space if not self.para_symbols else dict()
 
 
 def _is_label_invalid(label):

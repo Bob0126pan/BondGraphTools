@@ -24,6 +24,7 @@ class Component(BondGraphBase, PortManager):
         self._state_vars = state_vars
 
         self._params = params
+        self.control_vars
         self._constitutive_relations = constitutive_relations
 
     def __eq__(self, other):
@@ -46,6 +47,8 @@ class Component(BondGraphBase, PortManager):
                 return True
             elif isinstance(value, sp.Symbol):
                 return True
+            # elif value:
+            #     return True
             else:
                 return False
 
@@ -53,7 +56,7 @@ class Component(BondGraphBase, PortManager):
 
         for p, v in self.params.items():
             try:
-                if is_const(v) or is_const(v["value"]):
+                if is_const(v) or is_const(v["value"]):# or is_const[v['para_symbol']]:
                     continue
             except (KeyError, TypeError):
                 pass
@@ -89,6 +92,7 @@ class Component(BondGraphBase, PortManager):
         """See `BondGraphBase`"""
         models = self._build_relations()
         subs = []
+        substr=[]
 
         def _value_of(v):
             if isinstance(v, (int, float, complex, sp.Symbol)):
@@ -107,12 +111,14 @@ class Component(BondGraphBase, PortManager):
             try:
                 v = _value_of(value)
                 subs.append((sp.symbols(param), v))
+                substr.append(( sp.symbols(param), sp.symbols(self.name+"_"+param)))  
             except KeyError:
                 pass
             except ValueError as ex:
                 raise ValueError(f"({self}, {param}): {ex.args}")
 
-        return [model.subs(subs) for model in models]
+        return [model.subs(subs) for model in models] if not self.parent.para_symbols else [model.subs(substr) for model in models]
+
 
     @property
     def basis_vectors(self):
