@@ -424,6 +424,8 @@ class BondGraph(BondGraphBase, LabeledPortManager):
                 i = len(port_space)
                 port_space[sp.symbols((f"e_{i}", f"f_{i}"))] = port
 
+
+
         n = len(port_space)
         external_ports = {
             sp.symbols((f"e_{n + i}", f"f_{n + i}")): port

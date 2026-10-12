@@ -289,7 +289,7 @@ def Tube():
 def test_tube_buid_eqs():
     import BondGraphTools as bgt
     from BondGraphTools import expose, connect, add,draw
-    model=bgt.new(name='straight tube')
+    model=bgt.new(name='straight_tube')
     model.para_symbols=True
 
     C=bgt.new("C", name="C",library="base")     #(m6/J)
@@ -315,29 +315,28 @@ def test_tube_buid_eqs():
     bgt.connect(zero_junc,C)
     bgt.connect(one_junc_2,R2)
     bgt.connect(one_junc_2,L2)
-    from BondGraphTools import _find_or_make_port
-    #强制添加端口，并强制连接的情况下，可以实现部分方程的导出
-    port1=_find_or_make_port(one_junc_1, is_tail=True)
-    port2=_find_or_make_port(one_junc_2, is_tail=True)
-    # 强制connected 方便后续添加relationship
-    # expose(one_junc_1,3)
-    # expose(one_junc_2,3)
-    port1.is_connected=True
-    port2.is_connected=True
-    # model.map_port('P1', ((one_junc_1, 'e'),(one_junc_1, 'f')))
-    # model.map_port('P2', ((one_junc_2, 'e'),(one_junc_2, 'f')))
-    # expose(one_junc_1)
-    # expose(one_junc_2)
+    expose(one_junc_1,'0')
+    expose(one_junc_2,'1')
     print(model.constitutive_relations)
-    #  前半段采用para_symbols  True 求得带参数方程
-    # 后半段采用False 求不带参数方程，两个综合起来确定对应的方程。
     model.para_symbols=False
-    # model.map_port('P1', ((one_junc_1, 'e'),(one_junc_1, 'f')))
-    # model.map_port('P2', ((one_junc_2, 'e'),(one_junc_2, 'f')))
-    expose(one_junc_1)
-    expose(one_junc_2)
-    print(model.constitutive_relations)
-    pass
+    # print(model.constitutive_relations)
+    Se1=bgt.new("Se", name="Se1",library="base", value=11.997e6)     #(J/m6)
+    Se2=bgt.new("Se", name="Se2",library="base", value=10.664e6)     #(J/m6)
+    mainmodel=bgt.new(name='maintube')
+    mainmodel.add(model,Se1,Se2)
+    bgt.connect(Se1,model.get_port(0))
+    bgt.connect(model.get_port(1),Se2)
+    print(mainmodel.constitutive_relations)
+    timespan=[0,10]
+    print(mainmodel.state_vars)
+    x0={"x_0":5*1e-6, "x_1":0, "x_2":0}
+    t, x = bgt.simulate(mainmodel, timespan=timespan, x0=x0)
+    post = BondGraphPost(mainmodel, (t, x))
+    post.list_components()
+    tubepost = post.get_component('straight_tube.C')
+    post.plot_component('straight_tube.C')
+
+   
 
 def test_fluid_tube():
     import BondGraphTools as bgt
@@ -451,4 +450,4 @@ def branch():
         plt.grid()
     plt.show()
 
-test_tube_buid_eqs()
+testRCsimple()
